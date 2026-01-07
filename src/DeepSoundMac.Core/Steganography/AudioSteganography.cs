@@ -252,8 +252,11 @@ public static class AudioSteganography
     private static void EmbedDataLsb(byte[] audioData, byte[] dataToHide, short bitsPerSample)
     {
         int bytesPerSample = bitsPerSample / 8;
+        int totalBits = dataToHide.Length * 8;
+        int maxSamples = audioData.Length / bytesPerSample;
+        int iterations = Math.Min(totalBits, maxSamples);
         
-        for (int i = 0; i < dataToHide.Length * 8 && i < audioData.Length / bytesPerSample; i++)
+        for (int i = 0; i < iterations; i++)
         {
             int sampleOffset = i * bytesPerSample;
             int byteIndex = i / 8;
@@ -284,8 +287,9 @@ public static class AudioSteganography
     {
         int bytesPerSample = bitsPerSample / 8;
         byte[] result = new byte[byteCount];
+        int totalBits = byteCount * 8;
         
-        for (int i = 0; i < byteCount * 8; i++)
+        for (int i = 0; i < totalBits; i++)
         {
             int sampleIndex = startBit + i;
             int sampleOffset = sampleIndex * bytesPerSample;

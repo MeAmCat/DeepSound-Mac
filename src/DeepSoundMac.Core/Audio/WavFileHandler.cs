@@ -47,7 +47,7 @@ public static class WavFileHandler
     {
         ArgumentNullException.ThrowIfNull(stream);
         
-        using var reader = new BinaryReader(stream);
+        using var reader = new BinaryReader(stream, System.Text.Encoding.Default, leaveOpen: true);
         
         // RIFF header
         string riffHeader = new(reader.ReadChars(4));
@@ -96,8 +96,16 @@ public static class WavFileHandler
         }
         
         // Find data chunk (skip any other chunks)
-        while (true)
+        const int MaxChunksToSearch = 100; // Prevent infinite loop
+        int chunksSearched = 0;
+        
+        while (chunksSearched < MaxChunksToSearch)
         {
+            if (stream.Position >= stream.Length - 8)
+            {
+                throw new InvalidDataException("No data chunk found in WAV file.");
+            }
+            
             string chunkId = new(reader.ReadChars(4));
             int chunkSize = reader.ReadInt32();
             
@@ -109,8 +117,22 @@ public static class WavFileHandler
             else
             {
                 // Skip this chunk
-                reader.ReadBytes(chunkSize);
+                if (chunkSize > 0 && stream.Position + chunkSize <= stream.Length)
+                {
+                    reader.ReadBytes(chunkSize);
+                }
+                else
+                {
+                    throw new InvalidDataException($"Invalid chunk size: {chunkSize}");
+                }
             }
+            
+            chunksSearched++;
+        }
+        
+        if (chunksSearched >= MaxChunksToSearch)
+        {
+            throw new InvalidDataException("No data chunk found after searching maximum chunks.");
         }
         
         return wavFile;
@@ -136,7 +158,7 @@ public static class WavFileHandler
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(wavFile);
         
-        using var writer = new BinaryWriter(stream);
+        using var writer = new BinaryWriter(stream, System.Text.Encoding.Default, leaveOpen: true);
         
         int dataSize = wavFile.AudioData.Length;
         int fileSize = HeaderSize + dataSize - 8;

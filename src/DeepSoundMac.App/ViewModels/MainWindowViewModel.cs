@@ -184,8 +184,6 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private bool CanEncode() => _carrierWav != null && SecretFiles.Count > 0 && !IsProcessing && UsedCapacityBytes <= MaxCapacityBytes;
-
     [RelayCommand]
     private async Task DecodeAsync()
     {
@@ -237,8 +235,6 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private bool CanDecode() => _carrierWav != null && HasHiddenData && !IsProcessing;
-
     [RelayCommand]
     private async Task SaveExtractedFilesAsync()
     {
@@ -273,8 +269,6 @@ public partial class MainWindowViewModel : ViewModelBase
             IsProcessing = false;
         }
     }
-
-    private bool CanSaveExtracted() => ExtractedFiles.Count > 0 && !string.IsNullOrEmpty(OutputDirectory) && !IsProcessing;
 
     private static string FormatBytes(int bytes)
     {
