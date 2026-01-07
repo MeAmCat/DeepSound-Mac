@@ -1,0 +1,36 @@
+name: Build & Release macOS App
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Build app
+        run: |
+          xcodebuild \
+            -scheme DeepSound \
+            -configuration Release \
+            -derivedDataPath build
+
+      - name: Package app
+        run: |
+          cd build/Build/Products/Release
+          ditto -c -k --sequesterRsrc --keepParent "DeepSound.app" "DeepSound.zip"
+          mv DeepSound.zip $GITHUB_WORKSPACE/
+
+      - name: Generate release notes
+        id: notes
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
