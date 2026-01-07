@@ -15,6 +15,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Set Default Scheme
+        id: set-scheme
         run: |
           scheme_list=$(xcodebuild -list -json | tr -d "\n")
           default=$(echo "$scheme_list" | ruby -e "require 'json'; puts JSON.parse(STDIN.gets)['project']['targets'][0]")
@@ -22,16 +23,12 @@ jobs:
             echo "Error: No default scheme found"
             exit 1
           fi
-          echo "$default" | cat >default
+          echo "scheme=$default" >> $GITHUB_OUTPUT
           echo Using default scheme: "$default"
       - name: Build
         env:
-          scheme: ${{ default }}
+          scheme: ${{ steps.set-scheme.outputs.scheme }}
         run: |
-          if [ "$scheme" == "default" ]; then 
-            scheme=$(cat default)
-          fi
-          
           # Detect workspace or project file
           workspace_file=$(ls -A | grep -i '\.xcworkspace$' || true)
           project_file=$(ls -A | grep -i '\.xcodeproj$' || true)
