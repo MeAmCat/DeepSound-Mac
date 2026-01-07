@@ -35,7 +35,16 @@ Download the latest pre-built macOS application from the [Releases](https://gith
 
 After downloading:
 1. Extract the ZIP file
-2. Run the `DeepSoundMac.App` executable
+2. Open Terminal and navigate to the extracted folder
+3. Run the application:
+   ```bash
+   ./DeepSoundMac.App
+   ```
+   Or make it executable first if needed:
+   ```bash
+   chmod +x DeepSoundMac.App
+   ./DeepSoundMac.App
+   ```
 
 ### Prerequisites
 
