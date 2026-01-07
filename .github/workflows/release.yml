@@ -8,6 +8,9 @@ on:
 jobs:
   build:
     runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [osx-arm64, osx-x64]
 
     steps:
       - name: Checkout code
@@ -25,7 +28,7 @@ jobs:
         run: |
           dotnet publish src/DeepSoundMac.App/DeepSoundMac.App.csproj \
             -c Release \
-            -r osx-arm64 \
+            -r ${{ matrix.arch }} \
             --self-contained \
             -o publish/output
 
@@ -67,16 +70,17 @@ jobs:
             exit 1
           fi
           ditto -c -k --sequesterRsrc --keepParent \
-            "DeepSound.app" "DeepSound.zip"
-          if [ ! -s "DeepSound.zip" ]; then
-            echo "Error: DeepSound.zip was not created or is empty"
+            "DeepSound.app" "DeepSound-${{ matrix.arch }}.zip"
+          if [ ! -s "DeepSound-${{ matrix.arch }}.zip" ]; then
+            echo "Error: DeepSound-${{ matrix.arch }}.zip" \
+              "was not created or is empty"
             exit 1
           fi
-          mv DeepSound.zip "$GITHUB_WORKSPACE"/
+          mv DeepSound-${{ matrix.arch }}.zip "$GITHUB_WORKSPACE"/
 
       - name: Create release
         uses: >-
           softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b
         with:
           generate_release_notes: true
-          files: DeepSound.zip
+          files: DeepSound-${{ matrix.arch }}.zip
