@@ -56,7 +56,7 @@ public static class WavFileHandler
             throw new InvalidDataException("Invalid WAV file: Missing RIFF header.");
         }
         
-        int fileSize = reader.ReadInt32();
+        _ = reader.ReadInt32(); // fileSize (unused)
         
         string waveHeader = new(reader.ReadChars(4));
         if (waveHeader != "WAVE")
@@ -85,8 +85,8 @@ public static class WavFileHandler
             SampleRate = reader.ReadInt32()
         };
         
-        int byteRate = reader.ReadInt32();
-        short blockAlign = reader.ReadInt16();
+        _ = reader.ReadInt32(); // byteRate (unused)
+        _ = reader.ReadInt16(); // blockAlign (unused)
         wavFile.BitsPerSample = reader.ReadInt16();
         
         // Skip any extra format bytes

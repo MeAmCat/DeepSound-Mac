@@ -1,3 +1,5 @@
+using DeepSoundMac.Core.Utilities;
+
 namespace DeepSoundMac.Core.Models;
 
 /// <summary>
@@ -18,22 +20,45 @@ public class SecretFile
     /// <summary>
     /// Creates a SecretFile from a file path.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when file path is null, empty, or whitespace.</exception>
+    /// <exception cref="FileNotFoundException">Thrown when the file does not exist.</exception>
+    /// <exception cref="IOException">Thrown when the file cannot be read.</exception>
     public static SecretFile FromFile(string filePath)
     {
-        return new SecretFile
+        if (string.IsNullOrWhiteSpace(filePath))
         {
-            FileName = Path.GetFileName(filePath),
-            Data = File.ReadAllBytes(filePath)
-        };
+            throw new ArgumentException("File path must not be null, empty, or whitespace.", nameof(filePath));
+        }
+
+        if (!File.Exists(filePath))
+        {
+            throw new FileNotFoundException($"The file '{filePath}' does not exist.", filePath);
+        }
+
+        try
+        {
+            return new SecretFile
+            {
+                FileName = Path.GetFileName(filePath),
+                Data = File.ReadAllBytes(filePath)
+            };
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException or NotSupportedException)
+        {
+            throw new IOException($"Failed to read secret file from path '{filePath}'.", ex);
+        }
     }
     
     /// <summary>
     /// Saves the secret file to the specified directory.
+    /// If a file with the same name exists, a unique name with a counter will be used.
     /// </summary>
-    public void SaveTo(string directoryPath)
+    /// <returns>The actual path where the file was saved.</returns>
+    public string SaveTo(string directoryPath)
     {
-        string outputPath = Path.Combine(directoryPath, FileName);
+        string outputPath = FileUtilities.GetUniqueFilePath(directoryPath, FileName);
         File.WriteAllBytes(outputPath, Data);
+        return outputPath;
     }
 }
 

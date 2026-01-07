@@ -85,7 +85,7 @@
                                         </ListBox.ItemTemplate>
                                     </ListBox>
                                     
-                                    <TextBlock IsVisible="{Binding !SecretFiles.Count}" 
+                                    <TextBlock IsVisible="{Binding IsSecretFilesEmpty}" 
                                                Text="Drag and drop files here or click 'Add Files...'" 
                                                Foreground="Gray" HorizontalAlignment="Center"/>
                                 </StackPanel>
@@ -169,7 +169,7 @@
 
                                 <!-- Extracted Files List -->
                                 <Border Background="#F8F9FA" CornerRadius="8" Padding="15" 
-                                        IsVisible="{Binding ExtractedFiles.Count}">
+                                        IsVisible="{Binding HasExtractedFiles}">
                                     <StackPanel Spacing="10">
                                         <TextBlock Text="📄 Extracted Files" FontWeight="Bold" FontSize="14"/>
                                         <ListBox ItemsSource="{Binding ExtractedFiles}" MinHeight="100">

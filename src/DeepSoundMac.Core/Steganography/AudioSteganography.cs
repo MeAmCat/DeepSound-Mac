@@ -44,8 +44,8 @@ public static class AudioSteganography
         {
             throw new InvalidOperationException(
                 $"The carrier audio file is too small. " +
-                $"Maximum capacity: {carrierWav.MaxHiddenDataBytes} bytes, " +
-                $"Required: {dataToHide.Length} bytes.");
+                $"Maximum capacity: {carrierWav.MaxHiddenDataBytes} bytes ({carrierWav.TotalSamples} bits), " +
+                $"Required: {dataToHide.Length} bytes ({dataToHide.Length * 8} bits).");
         }
         
         // Clone the carrier and embed data

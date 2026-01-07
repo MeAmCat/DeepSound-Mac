@@ -8,6 +8,7 @@ using CommunityToolkit.Mvvm.Input;
 using DeepSoundMac.Core.Audio;
 using DeepSoundMac.Core.Models;
 using DeepSoundMac.Core.Steganography;
+using DeepSoundMac.Core.Utilities;
 
 namespace DeepSoundMac.App.ViewModels;
 
@@ -48,12 +49,26 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public ObservableCollection<SecretFileViewModel> SecretFiles { get; } = [];
     public ObservableCollection<SecretFileViewModel> ExtractedFiles { get; } = [];
+    
+    /// <summary>
+    /// Gets whether the SecretFiles collection is empty. Used for XAML bindings.
+    /// </summary>
+    public bool IsSecretFilesEmpty => SecretFiles.Count == 0;
+    
+    /// <summary>
+    /// Gets whether the ExtractedFiles collection has items. Used for XAML bindings.
+    /// </summary>
+    public bool HasExtractedFiles => ExtractedFiles.Count > 0;
 
     private WavFile? _carrierWav;
 
     public MainWindowViewModel()
     {
         OutputDirectory = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        
+        // Subscribe to collection changes to update computed properties
+        SecretFiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsSecretFilesEmpty));
+        ExtractedFiles.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasExtractedFiles));
     }
 
     partial void OnCarrierFilePathChanged(string? value)
@@ -108,7 +123,15 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private void UpdateCapacity()
     {
-        UsedCapacityBytes = SecretFiles.Sum(f => f.FileSize) + SecretFiles.Count * 100; // Rough estimate with overhead
+        // Estimate capacity overhead per file:
+        // - 4 bytes for filename length + average filename (~50 bytes)
+        // - 4 bytes for data length
+        // Plus header overhead: MagicBytes(7) + Version(1) + Flags(1) + PayloadLength(4) + FileCount(4) = 17 bytes
+        const int HeaderOverhead = 17;
+        const int PerFileOverhead = 60; // filename length(4) + avg filename(~50) + data length(4) + margin
+        
+        int estimatedOverhead = HeaderOverhead + SecretFiles.Count * PerFileOverhead;
+        UsedCapacityBytes = SecretFiles.Sum(f => f.FileSize) + estimatedOverhead;
         CapacityPercentage = MaxCapacityBytes > 0 ? (double)UsedCapacityBytes / MaxCapacityBytes * 100 : 0;
     }
 
@@ -158,6 +181,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
+            string? resultPath = null;
+            
             await Task.Run(() =>
             {
                 var files = SecretFiles.Select(f => SecretFile.FromFile(f.FilePath)).ToList();
@@ -165,14 +190,17 @@ public partial class MainWindowViewModel : ViewModelBase
                 
                 var outputWav = AudioSteganography.Encode(_carrierWav, files, password);
                 
-                string outputPath = Path.Combine(
-                    OutputDirectory ?? Environment.CurrentDirectory,
-                    $"stego_{Path.GetFileName(CarrierFilePath)}");
+                // Sanitize output file name and ensure unique path
+                string carrierFileName = Path.GetFileName(CarrierFilePath) ?? "output.wav";
+                string outputFileName = FileUtilities.SanitizeFileName($"stego_{carrierFileName}");
+                string outputDir = OutputDirectory ?? Environment.CurrentDirectory;
+                string outputPath = FileUtilities.GetUniqueFilePath(outputDir, outputFileName);
                 
                 WavFileHandler.Write(outputPath, outputWav);
-                
-                StatusMessage = $"Success! Output saved to: {outputPath}";
+                resultPath = outputPath;
             });
+            
+            StatusMessage = $"Success! Output saved to: {resultPath}";
         }
         catch (Exception ex)
         {
@@ -246,19 +274,20 @@ public partial class MainWindowViewModel : ViewModelBase
 
         try
         {
+            int savedCount = 0;
+            
             await Task.Run(() =>
             {
-                foreach (var file in ExtractedFiles)
+                // Use explicit LINQ filtering for files with data
+                foreach (var file in ExtractedFiles.Where(f => f.Data != null))
                 {
-                    if (file.Data != null)
-                    {
-                        string outputPath = Path.Combine(OutputDirectory, file.FileName);
-                        File.WriteAllBytes(outputPath, file.Data);
-                    }
+                    string outputPath = FileUtilities.GetUniqueFilePath(OutputDirectory, file.FileName);
+                    File.WriteAllBytes(outputPath, file.Data!);
+                    savedCount++;
                 }
             });
 
-            StatusMessage = $"Saved {ExtractedFiles.Count} file(s) to {OutputDirectory}";
+            StatusMessage = $"Saved {savedCount} file(s) to {OutputDirectory}";
         }
         catch (Exception ex)
         {
@@ -270,12 +299,7 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private static string FormatBytes(int bytes)
-    {
-        if (bytes < 1024) return $"{bytes} B";
-        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
-        return $"{bytes / (1024.0 * 1024.0):F2} MB";
-    }
+    private static string FormatBytes(int bytes) => FileUtilities.FormatBytes(bytes);
 }
 
 public partial class SecretFileViewModel : ObservableObject
@@ -291,12 +315,5 @@ public partial class SecretFileViewModel : ObservableObject
 
     public byte[]? Data { get; set; }
 
-    public string FileSizeFormatted => FormatBytes(FileSize);
-
-    private static string FormatBytes(int bytes)
-    {
-        if (bytes < 1024) return $"{bytes} B";
-        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
-        return $"{bytes / (1024.0 * 1024.0):F2} MB";
-    }
+    public string FileSizeFormatted => FileUtilities.FormatBytes(FileSize);
 }
