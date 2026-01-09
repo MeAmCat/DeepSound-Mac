@@ -1,56 +1,74 @@
-name: Xcode - Build and Analyze
+name: .NET Build and Test
 
 on:
   push:
     branches: [ "main" ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ "main" ]
 
 jobs:
   build:
-    name: Build and analyze default scheme using xcodebuild command
+    name: Build and test .NET solution
     runs-on: macos-latest
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Set Default Scheme
-        id: set-scheme
-        run: |
-          scheme_list=$(xcodebuild -list -json | tr -d "\n")
-          default=$(echo "$scheme_list" | ruby -e "require 'json'; puts JSON.parse(STDIN.gets)['project']['targets'][0]")
-          if [ -z "$default" ]; then
-            echo "Error: No default scheme found"
-            exit 1
-          fi
-          echo "scheme=$default" >> $GITHUB_OUTPUT
-          echo Using default scheme: "$default"
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      
+      - name: Restore dependencies
+        run: dotnet restore DeepSoundMac.sln
+      
       - name: Build
-        env:
-          scheme: ${{ steps.set-scheme.outputs.scheme }}
+        run: dotnet build DeepSoundMac.sln --configuration Release --no-restore
+      
+      - name: Test
+        run: dotnet test DeepSoundMac.sln --configuration Release --no-build --verbosity normal
+      
+      - name: Publish for macOS ARM64 (Apple Silicon)
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          # Detect workspace or project file
-          workspace_file=$(ls -A | grep -i '\.xcworkspace$' || true)
-          project_file=$(ls -A | grep -i '\.xcodeproj$' || true)
-          
-          if [ -n "$workspace_file" ]; then
-            filetype_parameter="workspace"
-            file_to_build="$workspace_file"
-          elif [ -n "$project_file" ]; then
-            filetype_parameter="project"
-            file_to_build="$project_file"
-          else
-            echo "Error: No Xcode workspace or project file found"
-            exit 1
-          fi
-          
-          file_to_build=$(echo "$file_to_build" | awk '{$1=$1;print}')
-          
-          # Check if xcpretty is available, otherwise use plain output
-          if command -v xcpretty &> /dev/null; then
-            xcodebuild clean build analyze -scheme "$scheme" -"$filetype_parameter" "$file_to_build" | xcpretty && exit ${PIPESTATUS[0]}
-          else
-            xcodebuild clean build analyze -scheme "$scheme" -"$filetype_parameter" "$file_to_build"
-          fi
+          dotnet publish src/DeepSoundMac.App/DeepSoundMac.App.csproj \
+            -c Release \
+            -r osx-arm64 \
+            --self-contained \
+            -o publish/osx-arm64
+      
+      - name: Publish for macOS x64 (Intel)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          dotnet publish src/DeepSoundMac.App/DeepSoundMac.App.csproj \
+            -c Release \
+            -r osx-x64 \
+            --self-contained \
+            -o publish/osx-x64
+      
+      - name: Create ZIP archives
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cd publish/osx-arm64
+          zip -r ../../DeepSoundMac-macOS-arm64.zip .
+          cd ../osx-x64
+          zip -r ../../DeepSoundMac-macOS-x64.zip .
+          cd ../..
+      
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            DeepSoundMac-macOS-arm64.zip
+            DeepSoundMac-macOS-x64.zip
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
